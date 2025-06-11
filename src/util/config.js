@@ -1,5 +1,5 @@
 const config = {
-  BASE_URL: "http://localhost:8000/api/", // ✅ change to your deployed URL in production
+  BASE_URL: "https://final-information-production.up.railway.app/api/",
 };
 
 export default config;
