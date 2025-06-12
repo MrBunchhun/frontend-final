@@ -6,8 +6,10 @@ import { request } from "../../util/request";
 const LoginPage = () => {
   const navigate = useNavigate();
   const { funLogin } = profileStore();
+
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -15,24 +17,30 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
+
     try {
       const res = await request("auth/login", "post", form);
       funLogin(res.user, res.token);
-      navigate("/");
-    } catch {
-      setError("Invalid email or password.");
+      navigate("/"); // Navigate home after login success
+    } catch (err) {
+      setError(err?.error || "Invalid email or password.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Social login with popup + window messaging
   const handleSocialLogin = (provider) => {
+    setError("");
     const popup = window.open(
-      `http://localhost:8000/api/auth/${provider}`,
+      `https://final-information-production.up.railway.app/api/auth/${provider}`,
       "_blank",
       "width=500,height=600"
     );
 
     const receiveMessage = (event) => {
-      if (event.origin !== "http://localhost:8000") return;
+      if (event.origin !== "https://final-information-production.up.railway.app") return;
 
       const { user, token } = event.data || {};
       if (user && token) {
@@ -67,6 +75,7 @@ const LoginPage = () => {
             onChange={handleChange}
             placeholder="Email"
             required
+            disabled={loading}
             className="w-full px-4 py-2 rounded bg-[#2c2c2e] border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           <input
@@ -76,14 +85,18 @@ const LoginPage = () => {
             onChange={handleChange}
             placeholder="Password"
             required
+            disabled={loading}
             className="w-full px-4 py-2 rounded bg-[#2c2c2e] border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           {error && <p className="text-sm text-red-500 text-center">{error}</p>}
           <button
             type="submit"
-            className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded transition"
+            disabled={loading}
+            className={`w-full py-2 rounded text-white transition ${
+              loading ? "bg-gray-500 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+            }`}
           >
-            Login
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
         <div className="flex items-center my-6">
@@ -93,12 +106,14 @@ const LoginPage = () => {
         </div>
         <button
           onClick={() => handleSocialLogin("google")}
+          disabled={loading}
           className="w-full mb-3 bg-white text-black py-2 rounded hover:bg-gray-100 transition"
         >
           Continue with Google
         </button>
         <button
           onClick={() => handleSocialLogin("github")}
+          disabled={loading}
           className="w-full bg-[#1f2a3a] text-white py-2 rounded hover:bg-[#1a2633] transition"
         >
           Continue with GitHub
@@ -108,6 +123,7 @@ const LoginPage = () => {
           <button
             onClick={() => navigate("/register")}
             className="text-red-500 hover:underline"
+            disabled={loading}
           >
             Register
           </button>
