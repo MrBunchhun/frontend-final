@@ -7,7 +7,7 @@ const RegisterPage = () => {
 
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [otp, setOtp] = useState("");
-  const [step, setStep] = useState(1); // Step 1 = Register form, Step 2 = OTP input
+  const [step, setStep] = useState(1); // 1 = Register, 2 = OTP
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [cooldown, setCooldown] = useState(0);
@@ -19,50 +19,67 @@ const RegisterPage = () => {
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
+    setMessage("");
     try {
       const res = await request("auth/register", "post", form);
-      setMessage(res.message);
-      setStep(2); // move to OTP step
+      if (res.message) {
+        setMessage(res.message);
+        setStep(2);
+      } else {
+        setError("Unexpected response. Please try again.");
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed.");
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Registration failed.";
+      setError(errorMsg);
     }
   };
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setError("");
+    setMessage("");
     try {
       const res = await request("auth/verify-otp", "post", {
         email: form.email,
         otp,
       });
       setMessage(res.message);
-      // ✅ After verify success, user must login manually
       setTimeout(() => {
         navigate("/login");
       }, 2000);
     } catch (err) {
-      setError(err.response?.data?.error || "OTP verification failed.");
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "OTP verification failed.";
+      setError(errorMsg);
     }
   };
 
   const handleResendOtp = async () => {
     setError("");
+    setMessage("");
     try {
       const res = await request("auth/resend-otp", "post", {
         email: form.email,
       });
       setMessage(res.message);
-      setCooldown(30); //Start 30 second cooldown
+      setCooldown(30);
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to resend OTP.");
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to resend OTP.";
+      setError(errorMsg);
     }
   };
+
   useEffect(() => {
     if (cooldown > 0) {
-      const timer = setTimeout(() => {
-        setCooldown(cooldown - 1);
-      }, 1000);
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
       return () => clearTimeout(timer);
     }
   }, [cooldown]);
@@ -103,9 +120,7 @@ const RegisterPage = () => {
                 required
                 className="w-full px-4 py-2 rounded bg-[#2c2c2e] border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
               />
-              {error && (
-                <p className="text-red-500 text-sm text-center">{error}</p>
-              )}
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
               <button
                 type="submit"
                 className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded transition"
@@ -128,9 +143,7 @@ const RegisterPage = () => {
                 required
                 className="w-full px-4 py-2 rounded bg-[#2c2c2e] border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              {error && (
-                <p className="text-red-500 text-sm text-center">{error}</p>
-              )}
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
               <button
                 type="submit"
                 className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded transition"
@@ -138,8 +151,6 @@ const RegisterPage = () => {
                 Verify OTP
               </button>
             </form>
-
-            {/* Resend OTP Button with Cooldown */}
             <div className="text-center mt-4">
               {cooldown > 0 ? (
                 <p className="text-gray-400 text-sm">
@@ -160,8 +171,6 @@ const RegisterPage = () => {
         {message && (
           <p className="text-green-400 text-sm text-center mt-4">{message}</p>
         )}
-
-        {/* Already have account */}
         {step === 1 && (
           <p className="text-sm text-center text-gray-400 mt-6">
             Already have an account?{" "}

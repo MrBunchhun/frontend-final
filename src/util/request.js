@@ -20,7 +20,7 @@ export const request = async (
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...headers, // custom headers can override if needed
+        ...headers, 
       },
     });
 
