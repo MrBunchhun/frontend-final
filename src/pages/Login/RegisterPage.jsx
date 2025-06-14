@@ -1,88 +1,219 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { request } from "../../util/request";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [error, setError] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState(1);
+  const [errors, setErrors] = useState({}); // 👈 now store field errors
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value.trim() }));
+    setErrors((prev) => ({ ...prev, [e.target.name]: "" })); // clear field error while typing
+  };
 
-  const handleSubmit = async (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    setError("");
+    setErrors({});
     setMessage("");
-    setLoading(true);
 
     try {
-      const res = await axios.post(
-        "https://final-information-production.up.railway.app/api/auth/register",
-        form
-      );
-      setMessage(res.data.message);
-      // optionally auto-navigate to OTP verification page
-      setTimeout(() => navigate("/verify-otp", { state: { email: form.email } }), 2000);
+      const res = await request("auth/register", "post", form);
+      setMessage(res.message);
+      setStep(2);
     } catch (err) {
-      const errMsg =
-        err?.response?.data?.error || err?.response?.data?.message || "Registration failed";
-      setError(typeof errMsg === "object" ? Object.values(errMsg).flat().join(", ") : errMsg);
-    } finally {
-      setLoading(false);
+      if (err.errors) {
+        setErrors(err.errors); // Laravel returns field errors under "errors"
+      } else {
+        setErrors({ general: err.message || "Registration failed." });
+      }
     }
   };
 
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setErrors({});
+    setMessage("");
+
+    try {
+      const res = await request("auth/verify-otp", "post", {
+        email: form.email,
+        otp,
+      });
+      setMessage(res.message);
+      setTimeout(() => navigate("/login"), 2000);
+    } catch (err) {
+      if (err.errors) {
+        setErrors(err.errors);
+      } else {
+        setErrors({ general: err.message || "OTP verification failed." });
+      }
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setErrors({});
+    setMessage("");
+
+    try {
+      const res = await request("auth/resend-otp", "post", {
+        email: form.email,
+      });
+      setMessage(res.message);
+      setCooldown(30);
+    } catch (err) {
+      if (err.errors) {
+        setErrors(err.errors);
+      } else {
+        setErrors({ general: err.message || "Failed to resend OTP." });
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown((prev) => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
   return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="space-y-4 bg-[#1c1c1e] p-6 rounded-lg w-full max-w-sm">
-        <h2 className="text-2xl font-bold mb-4">Register</h2>
-        <input
-          name="name"
-          value={form.name}
-          onChange={handleChange}
-          required
-          placeholder="Name"
-          className="w-full p-2 rounded bg-[#2c2c2e] border border-gray-600 text-white"
-        />
-        <input
-          name="email"
-          type="email"
-          value={form.email}
-          onChange={handleChange}
-          required
-          placeholder="Email"
-          className="w-full p-2 rounded bg-[#2c2c2e] border border-gray-600 text-white"
-        />
-        <input
-          name="password"
-          type="password"
-          value={form.password}
-          onChange={handleChange}
-          required
-          placeholder="Password"
-          className="w-full p-2 rounded bg-[#2c2c2e] border border-gray-600 text-white"
-        />
-        {error && <p className="text-red-500 text-sm">{error}</p>}
-        {message && <p className="text-green-400 text-sm">{message}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className={`w-full py-2 bg-red-600 rounded hover:bg-red-700 ${
-            loading ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-        >
-          {loading ? "Registering..." : "Register"}
-        </button>
-        <p className="text-sm text-gray-400 mt-2 text-center">
-          Already have an account?{" "}
-          <button onClick={() => navigate("/login")} className="text-red-500 hover:underline">
-            Login
-          </button>
-        </p>
-      </form>
+    <div className="min-h-screen bg-[#131313] flex items-center justify-center px-4">
+      <div className="bg-[#1c1c1e] w-full max-w-sm p-8 rounded-xl shadow-lg">
+        {step === 1 ? (
+          <>
+            <h2 className="text-2xl font-bold text-white text-center mb-6">
+              Register
+            </h2>
+
+            <form onSubmit={handleRegister} className="space-y-4">
+              {/* Name */}
+              <input
+                type="text"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                placeholder="Name"
+                required
+                className="w-full px-4 py-2 rounded bg-[#2c2c2e] border border-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-red-500"
+              />
+              {errors.name && (
+                <p className="text-red-400 text-sm">{errors.name}</p>
+              )}
+
+              {/* Email */}
+              <input
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="Email"
+                required
+                className="w-full px-4 py-2 rounded bg-[#2c2c2e] border border-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-red-500"
+              />
+              {errors.email && (
+                <p className="text-red-400 text-sm">{errors.email}</p>
+              )}
+
+              {/* Password */}
+              <input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Password"
+                required
+                className="w-full px-4 py-2 rounded bg-[#2c2c2e] border border-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-red-500"
+              />
+              {errors.password && (
+                <p className="text-red-400 text-sm">{errors.password}</p>
+              )}
+
+              {/* General Error */}
+              {errors.general && (
+                <p className="text-red-500 text-sm text-center">
+                  {errors.general}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded transition"
+              >
+                Register
+              </button>
+            </form>
+
+            {/* Already have an account */}
+            <p className="text-sm text-center text-gray-400 mt-6">
+              Already have an account?{" "}
+              <button
+                onClick={() => navigate("/login")}
+                className="text-red-500 hover:underline"
+              >
+                Login
+              </button>
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-2xl font-bold text-white text-center mb-6">
+              Verify OTP
+            </h2>
+
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <input
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                placeholder="Enter 6-digit OTP"
+                required
+                className="w-full px-4 py-2 rounded bg-[#2c2c2e] border border-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-green-500"
+              />
+              {errors.otp && (
+                <p className="text-red-400 text-sm">{errors.otp}</p>
+              )}
+              {errors.general && (
+                <p className="text-red-400 text-sm text-center">
+                  {errors.general}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded transition"
+              >
+                Verify OTP
+              </button>
+            </form>
+
+            <div className="text-center mt-4">
+              {cooldown > 0 ? (
+                <p className="text-gray-400 text-sm">
+                  You can resend OTP in {cooldown} seconds
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  className="text-blue-400 text-sm hover:underline"
+                >
+                  Resend OTP
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Global message (Success) */}
+        {message && (
+          <p className="text-green-400 text-sm text-center mt-4">{message}</p>
+        )}
+      </div>
     </div>
   );
 };
