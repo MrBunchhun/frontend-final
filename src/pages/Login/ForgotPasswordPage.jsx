@@ -17,7 +17,7 @@ const ForgotPasswordPage = () => {
       });
       setMessage(res.message);
     } catch (err) {
-      setError(err?.error || "Failed to send reset link.");
+      setError(err?.error || "Failed to send reset link!.");
     }
   };
 
